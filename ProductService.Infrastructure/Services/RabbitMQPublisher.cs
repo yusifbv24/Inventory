@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using ProductService.Application.Interfaces;
 using RabbitMQ.Client;
 
@@ -12,55 +11,20 @@ namespace ProductService.Infrastructure.Services
         private readonly IConnection _connection;
         private readonly IModel _channel;
         private readonly string _exchangeName = "inventory-events";
-        private readonly ILogger<RabbitMQPublisher> _logger;
 
-        public RabbitMQPublisher(IConfiguration configuration, ILogger<RabbitMQPublisher> logger)
+        public RabbitMQPublisher(IConfiguration configuration)
         {
-            _logger = logger;
-
-
-            var hostname = configuration["RabbitMQ:HostName"] ??
-                           Environment.GetEnvironmentVariable("RabbitMQ__HostName") ??
-                           "localhost";
-
-            var username = configuration["RabbitMQ:UserName"] ??
-                          Environment.GetEnvironmentVariable("RabbitMQ__UserName") ??
-                          "guest";
-
-            var password = configuration["RabbitMQ:Password"] ??
-                          Environment.GetEnvironmentVariable("RabbitMQ__Password") ??
-                          "guest";
-
-            var port = int.Parse(configuration["RabbitMQ:Port"] ??
-                                Environment.GetEnvironmentVariable("RabbitMQ__Port") ??
-                                "5672");
-
-            _logger.LogInformation($"Connecting to RabbitMQ at {hostname}:{port} with user {username}");
-
-
             var factory = new ConnectionFactory
             {
-                HostName = hostname,
-                UserName = username,
-                Password = password,
-                Port = port,
-                // Add connection retry logic
-                AutomaticRecoveryEnabled = true,
-                NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
+                HostName = configuration["RabbitMQ:HostName"] ?? "localhost",
+                UserName = configuration["RabbitMQ:UserName"] ?? "guest",
+                Password = configuration["RabbitMQ:Password"] ?? "guest",
+                Port = int.Parse(configuration["RabbitMQ:Port"] ?? "5672")
             };
 
-            try
-            {
-                _connection = factory.CreateConnection();
-                _channel = _connection.CreateModel();
-                _channel.ExchangeDeclare(_exchangeName, ExchangeType.Topic, durable: true);
-                _logger.LogInformation("Successfully connected to RabbitMQ");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to connect to RabbitMQ at {hostname}:{port}");
-                throw;
-            }
+            _connection = factory.CreateConnection();
+            _channel = _connection.CreateModel();
+            _channel.ExchangeDeclare(_exchangeName, ExchangeType.Topic, durable: true);
         }
 
         public async Task PublishAsync<T>(T message, string routingKey, CancellationToken cancellationToken = default)
@@ -78,10 +42,6 @@ namespace ProductService.Infrastructure.Services
                     routingKey: routingKey,
                     basicProperties: properties,
                     body: body);
-
-                _logger.LogDebug($"Published message to {routingKey}");
-
-
             }, cancellationToken);
         }
 

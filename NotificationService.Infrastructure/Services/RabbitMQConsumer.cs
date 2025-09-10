@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
@@ -20,72 +21,45 @@ namespace NotificationService.Infrastructure.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<RabbitMQConsumer> _logger;
-        private IConnection? _connection;
-        private IModel? _channel;
-        private readonly IConfiguration _configuration;
+        private readonly IConnection _connection;
+        private readonly IModel _channel;
         private readonly string _queueName = "notification-queue";
 
         public RabbitMQConsumer(IServiceProvider serviceProvider, IConfiguration configuration, ILogger<RabbitMQConsumer> logger)
         {
             _serviceProvider = serviceProvider;
-            _configuration = configuration;
             _logger = logger;
 
-            InitializeRabbitMQ();
-        }
-        private void InitializeRabbitMQ()
-        {
-            try
+            var factory = new ConnectionFactory
             {
-                var hostname = _configuration["RabbitMQ:HostName"] ??
-                                              Environment.GetEnvironmentVariable("RabbitMQ__HostName") ??
-                                              "localhost";
+                HostName = configuration["RabbitMQ:HostName"] ?? "localhost",
+                UserName = configuration["RabbitMQ:UserName"] ?? "guest",
+                Password = configuration["RabbitMQ:Password"] ?? "guest",
+                DispatchConsumersAsync = true,
+                AutomaticRecoveryEnabled = true,
+                NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
+            };
 
-                var username = _configuration["RabbitMQ:UserName"] ??
-                              Environment.GetEnvironmentVariable("RabbitMQ__UserName") ??
-                              "guest";
+            _connection = factory.CreateConnection("NotificationService");
+            _channel = _connection.CreateModel();
 
-                var password = _configuration["RabbitMQ:Password"] ??
-                              Environment.GetEnvironmentVariable("RabbitMQ__Password") ??
-                              "guest";
+            // Set QoS
+            _channel.BasicQos(prefetchSize:0, prefetchCount: 1, global: false);
 
-                var port = int.Parse(_configuration["RabbitMQ:Port"] ??
-                                    Environment.GetEnvironmentVariable("RabbitMQ__Port") ??
-                                    "5672");
 
-                _logger.LogInformation($"Connecting RabbitMQ Consumer to {hostname}:{port} with user {username}");
+            // Declare exchange and queue
+            _channel.ExchangeDeclare("inventory-events", ExchangeType.Topic, durable: true);
+            _channel.QueueDeclare(_queueName, durable: true, exclusive: false, autoDelete: false);
 
-                var factory = new ConnectionFactory
-                {
-                    HostName = hostname,
-                    UserName = username,
-                    Password = password,
-                    Port = port,
-                    AutomaticRecoveryEnabled = true,
-                    NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
-                };
 
-                _connection = factory.CreateConnection();
-                _channel = _connection.CreateModel();
-
-                _channel.ExchangeDeclare("inventory-events", ExchangeType.Topic, durable: true);
-                _channel.QueueDeclare(_queueName, durable: true, exclusive: false, autoDelete: false);
-                // Bind all event types we want to listen to
-                _channel.QueueBind(_queueName, "inventory-events", "approval.request.created");
-                _channel.QueueBind(_queueName, "inventory-events", "approval.request.processed");
-                _channel.QueueBind(_queueName, "inventory-events", "product.created");
-                _channel.QueueBind(_queueName, "inventory-events", "product.deleted");
-                _channel.QueueBind(_queueName, "inventory-events", "product.updated");
-                _channel.QueueBind(_queueName, "inventory-events", "route.created");
-                _channel.QueueBind(_queueName, "inventory-events", "route.completed");
-
-                _logger.LogInformation("RabbitMQ Consumer successfully connected");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to initialize RabbitMQ connection");
-                throw;
-            }
+            // Bind all event types we want to listen to
+            _channel.QueueBind(_queueName, "inventory-events", "approval.request.created");
+            _channel.QueueBind(_queueName, "inventory-events", "approval.request.processed");
+            _channel.QueueBind(_queueName, "inventory-events", "product.created");
+            _channel.QueueBind(_queueName, "inventory-events", "product.deleted");
+            _channel.QueueBind(_queueName, "inventory-events", "product.updated");
+            _channel.QueueBind(_queueName, "inventory-events", "route.created");
+            _channel.QueueBind(_queueName, "inventory-events", "route.completed");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

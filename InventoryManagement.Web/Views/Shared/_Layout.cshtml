@@ -173,62 +173,63 @@
     <script src="~/js/errorHandler.js" asp-append-version="true"></script>
     <script src="~/js/app-config.js" asp-append-version="true"></script>
     <script>
-        // Initialize global variables at the top
+                function toggleSidebar() {
+            document.body.classList.toggle('sidebar-open');
+        }
+        // Global notification variables
         let notificationConnection = null;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
 
-        // Store user state
-        const isAdmin = @(User.IsInRole("Admin") ? "true" : "false");
-        const isAuthenticated = @(User.Identity?.IsAuthenticated == true ? "true" : "false");
+        // Store whether user is admin for JavaScript usage
+            const isAdmin = @(User.IsInRole("Admin").ToString().ToLower());
 
-        // Document ready handler
         $(document).ready(function() {
             // Sidebar toggle
-            $('#menu-toggle').click(function(e) {
-                e.preventDefault();
-                $('body').toggleClass('sidebar-toggled');
-                $('#wrapper').toggleClass('toggled');
+        $('#menu-toggle').click(function(e) {
+            e.preventDefault();
+            $('body').toggleClass('sidebar-toggled');
+            $('#wrapper').toggleClass('toggled');
 
-                if ($('#wrapper').hasClass('toggled')) {
-                    $('.main-content').css('margin-left', '0');
-                } else {
-                    $('.main-content').css('margin-left', 'var(--sidebar-width)');
-                }
-            });
+            // Adjust main content margin
+            if ($('#wrapper').hasClass('toggled')) {
+                $('.main-content').css('margin-left', '0');
+            } else {
+                $('.main-content').css('margin-left', 'var(--sidebar-width)');
+            }
+        });
 
             // Only initialize notifications if user is authenticated
-            if (isAuthenticated === "true" && $('#jwtToken').val()) {
+            if ($('#jwtToken').val()) {
                 initializeNotifications();
                 setupNotificationHandlers();
                 loadNotificationCount();
                 loadRecentNotifications();
 
                 // Check for pending approvals if admin
-                if (isAdmin === "true") {
-                    loadPendingApprovalsCount();
+                if (isAdmin) {
+                loadPendingApprovalsCount();
                 }
             }
         });
 
-        // Initialize SignalR notifications
-        function initializeNotifications() {
+            function initializeNotifications() {
             const token = $('#jwtToken').val();
             if (!token) {
                 console.error('No JWT token available');
                 return;
             }
 
-            // Check if already connected
-            if (notificationConnection && notificationConnection.state === signalR.HubConnectionState.Connected) {
+            // Add check for existing connection
+            if(notificationConnection&&notificationConnection.state === signalR.HubConnectionState.Connected) {
                 console.log('SignalR already connected');
                 return;
-            }
+			}
 
-            const hubUrl = window.location.origin + '/notificationHub';
-            console.log('Connecting to SignalR hub at:', hubUrl);
 
-            // Create new connection
+         const hubUrl = window.location.origin + '/notificationHub';
+                    console.log('Connecting to SignalR hub at:', hubUrl);
+
             notificationConnection = new signalR.HubConnectionBuilder()
                 .withUrl(hubUrl, {
                     accessTokenFactory: () => token,
@@ -240,71 +241,64 @@
                 .configureLogging(signalR.LogLevel.Information)
                 .build();
 
-            // Setup connection event handlers
-            setupConnectionHandlers();
+            // Handle connection events
+            if(notificationConnection){
+                    notificationConnection.onreconnecting((error) => {
+                    console.warn('SignalR reconnecting...', error);
+                });
 
+                    notificationConnection.onreconnected((connectionId) => {
+                    console.log('SignalR reconnected:', connectionId);
+                    reconnectAttempts = 0;
+                    loadNotificationCount(); // Refresh count after reconnection
+                });
+
+                notificationConnection.onclose((error) => {
+                    console.error('SignalR connection closed:', error);
+
+                    // Try manual reconnection after delay
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        setTimeout(() => {
+                            console.log(`Attempting manual reconnection (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                            startConnection();
+                        }, 5000 * reconnectAttempts);
+                    }
+                });
+
+                // Handle incoming notifications
+                notificationConnection.on("ReceiveNotification", function(notification) {
+                    console.log('Notification received:', notification);
+
+                    // Show toast notification
+                    showToast(`${notification.title}: ${notification.message}`, getNotificationType(notification.type));
+
+                    // Update notification count
+                    incrementNotificationCount();
+
+                    // Refresh notification dropdown if open
+                    if ($('#notificationDropdown').hasClass('show')) {
+                        loadRecentNotifications();
+                    }
+
+                    // Play notification sound
+                    playNotificationSound();
+
+                    // If admin and approval request, update pending count
+                    if (isAdmin && notification.type === 'ApprovalRequest') {
+                    loadPendingApprovalsCount();
+                        }
+                });
+
+                // Handle connection confirmation
+                notificationConnection.on("Connected", function(data) {
+                    console.log('Connection confirmed:', data);
+                });
+            }
             // Start the connection
             startConnection();
-        }
-
-        // Setup SignalR connection handlers
-        function setupConnectionHandlers() {
-            if (!notificationConnection) return;
-
-            notificationConnection.onreconnecting((error) => {
-                console.warn('SignalR reconnecting...', error);
-            });
-
-            notificationConnection.onreconnected((connectionId) => {
-                console.log('SignalR reconnected:', connectionId);
-                reconnectAttempts = 0;
-                loadNotificationCount();
-            });
-
-            notificationConnection.onclose((error) => {
-                console.error('SignalR connection closed:', error);
-
-                if (reconnectAttempts < maxReconnectAttempts) {
-                    reconnectAttempts++;
-                    setTimeout(() => {
-                        console.log(`Attempting reconnection (${reconnectAttempts}/${maxReconnectAttempts})...`);
-                        startConnection();
-                    }, 5000 * reconnectAttempts);
-                }
-            });
-
-            // Handle incoming notifications
-            notificationConnection.on("ReceiveNotification", function(notification) {
-                console.log('Notification received:', notification);
-
-                // Show toast notification
-                showToast(notification.title + ': ' + notification.message, getNotificationType(notification.type));
-
-                // Update notification count
-                incrementNotificationCount();
-
-                // Refresh notification dropdown if open
-                if ($('.notification-dropdown').hasClass('show')) {
-                    loadRecentNotifications();
-                }
-
-                // Play notification sound
-                playNotificationSound();
-
-                // If admin and approval request, update pending count
-                if (isAdmin === "true" && notification.type === 'ApprovalRequest') {
-                    loadPendingApprovalsCount();
-                }
-            });
-
-            // Handle connection confirmation
-            notificationConnection.on("Connected", function(data) {
-                console.log('Connection confirmed:', data);
-            });
-        }
-
-        // Start SignalR connection
-        function startConnection() {
+            }
+            function startConnection() {
             if (notificationConnection && notificationConnection.state === signalR.HubConnectionState.Disconnected) {
                 notificationConnection.start()
                     .then(() => {
@@ -316,62 +310,114 @@
                     });
             }
         }
+            function playNotificationSound() {
+                try {
+                    // First, ensure the sound file exists
+                    const audioUrl = '/sounds/notify.mp3';
 
-        // Play notification sound with better error handling
-        function playNotificationSound() {
-            try {
-                // Create audio element
-                const audio = new Audio();
-                audio.volume = 0.5;
+                    // Create a promise to handle the audio loading
+                    const audio = new Audio();
+                    audio.volume = 0.5;
 
-                // Try to use the notification sound file
-                const soundUrl = '/sounds/notify.mp3';
+                    // Add error handling for missing file
+                    audio.addEventListener('error', function(e) {
+                        console.error('Audio file error:', e);
+                        // Fallback to a data URI beep sound if file is missing
+                        const beepSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE';
+                        audio.src = beepSound;
+                        audio.play().catch(err => console.log('Fallback sound failed:', err));
+                    });
 
-                // Fallback to data URI if file doesn't exist
-                const fallbackSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE';
+                    // Set the source and attempt to play
+                    audio.src = audioUrl;
 
-                // Set up error handling
-                audio.addEventListener('error', function(e) {
-                    console.log('Primary audio failed, using fallback');
-                    audio.src = fallbackSound;
-                    audio.play().catch(err => console.log('Fallback audio failed:', err));
-                });
+                    // Use a more robust play mechanism
+                    const playPromise = audio.play();
 
-                // Try to play the sound
-                audio.src = soundUrl;
-                const playPromise = audio.play();
-
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            console.log('Notification sound played');
-                        })
-                        .catch(error => {
-                            console.log('Audio play failed:', error);
-                            // Try fallback sound
-                            audio.src = fallbackSound;
-                            audio.play().catch(e => console.log('Fallback failed:', e));
-                        });
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                console.log('Notification sound played successfully');
+                            })
+                            .catch(error => {
+                                console.error('Error playing notification sound:', error);
+                                // Try to play after user interaction if autoplay is blocked
+                                document.addEventListener('click', function playOnce() {
+                                    audio.play().catch(e => console.log('Still cannot play:', e));
+                                    document.removeEventListener('click', playOnce);
+                                });
+                            });
+                    }
+                } catch (error) {
+                    console.error('Error in playNotificationSound:', error);
                 }
-            } catch (error) {
-                console.error('Error in playNotificationSound:', error);
             }
-        }
 
-        // Setup notification UI handlers
+            @if (User.IsInRole("Admin"))
+                {
+                <text>
+                function loadPendingApprovalsCount() {
+                    // Use the configuration to build the correct URL
+                    const apiUrl = AppConfig.buildApiUrl('approvalrequests?pageNumber=1&pageSize=1');
+
+                    $.ajax({
+                        url: apiUrl,
+                        type: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + $('#jwtToken').val()
+                        },
+                        success: function(data) {
+                            const count = data.totalCount || 0;
+                            updatePendingApprovalsCount(count);
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Failed to load pending approvals:', error);
+                            // In production, don't show technical errors to users
+                            if (AppConfig.environment === 'production') {
+                                console.log('Service temporarily unavailable');
+                            } else {
+                                console.error('API URL:', apiUrl);
+                                console.error('Response:', xhr.responseText);
+                            }
+                        }
+                    });
+                }
+
+                function updatePendingApprovalsCount(count) {
+                    const $badge = $('#pendingApprovalsCount');
+                    if (count > 0) {
+                        $badge.text(count).show();
+                    } else {
+                        $badge.hide();
+                    }
+
+                    // Also update sidebar badge if exists
+                    const $sidebarBadge = $('#sidebarPendingCount');
+                    if ($sidebarBadge.length) {
+                        if (count > 0) {
+                            $sidebarBadge.text(count).show();
+                        } else {
+                            $sidebarBadge.hide();
+                        }
+                    }
+                }
+                </text>
+            }
+
         function setupNotificationHandlers() {
+            // Notification bell click handler
             $('#notificationIcon').on('click', function(e) {
                 e.preventDefault();
                 loadRecentNotifications();
             });
 
+            // Mark all as read handler
             $('#markAllAsRead').on('click', function(e) {
                 e.preventDefault();
                 markAllAsRead();
             });
         }
 
-        // Load notification count
         function loadNotificationCount() {
             $.ajax({
                 url: '/Notifications/GetUnreadCount',
@@ -385,7 +431,6 @@
             });
         }
 
-        // Load recent notifications
         function loadRecentNotifications() {
             $('#notificationList').html(`
                 <div class="text-center py-3">
@@ -413,7 +458,6 @@
             });
         }
 
-        // Render notifications in dropdown
         function renderNotifications(notifications) {
             let html = '';
 
@@ -433,7 +477,6 @@
             $('#notificationList').html(html);
         }
 
-        // Create notification item HTML
         function createNotificationItem(notification) {
             const timeAgo = formatTimeAgo(notification.createdAt);
             const unreadClass = notification.isRead ? '' : 'unread';
@@ -460,31 +503,36 @@
             `;
         }
 
-        // Mark notification as read
-        function markAsRead(notificationId) {
+    function markAsRead(notificationId) {
             $.ajax({
                 url: '/Notifications/MarkAsRead',
                 type: 'POST',
                 data: JSON.stringify(notificationId),
                 contentType: 'application/json',
                 headers: {
-                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val()
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val(),
+                    'Content-Type': 'application/json'
                 },
                 success: function(response) {
-                    $(`.notification-item[data-id="${notificationId}"]`).removeClass('unread');
-                    loadNotificationCount();
+                        $(`.notification-item[data-id="${notificationId}"]`).removeClass('unread');
+                            loadNotificationCount();
                 },
                 error: function(xhr, status, error) {
-                    console.error('Failed to mark as read:', error);
+                        const errorMessage = ErrorHandler.parseErrorMessage(xhr, 'Failed to mark notification as read');
+                        showToast(errorMessage, 'error');
                 }
             });
         }
 
-        // Mark all notifications as read
-        function markAllAsRead() {
+                function markAllAsRead() {
+                         // Find the first available CSRF token
             var token = $('input[name="__RequestVerificationToken"]').first().val();
-
-            $.ajax({
+                 if (!token) {
+            // If no token found in forms, create a temporary form to get one
+            var tempForm = $('<form>').html('@Html.AntiForgeryToken()');
+            token = tempForm.find('input[name="__RequestVerificationToken"]').val();
+            }
+                    $.ajax({
                 url: '/Notifications/MarkAllAsRead',
                 type: 'POST',
                 headers: {
@@ -496,19 +544,19 @@
                     updateNotificationBadge(0);
                     showToast('All notifications marked as read', 'success');
 
+                    // Reload notifications if dropdown is open
                     if ($('.notification-dropdown').hasClass('show')) {
                         loadRecentNotifications();
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Mark all as read failed:', error);
+                    console.error('Mark all as read failed:', xhr.responseText);
                     showToast('Failed to mark notifications as read', 'error');
                 }
             });
         }
 
-        // Update notification badge
-        function updateNotificationBadge(count) {
+                function updateNotificationBadge(count) {
             const $badge = $('#notificationBadge');
             const $sidebarBadge = $('#sidebarUnreadCount');
             count = parseInt(count) || 0;
@@ -522,54 +570,18 @@
             }
         }
 
-        // Increment notification count
         function incrementNotificationCount() {
             const $badge = $('#notificationBadge');
             const current = parseInt($badge.text()) || 0;
             updateNotificationBadge(current + 1);
         }
 
-        // Admin-specific functions
-        @if (User.IsInRole("Admin"))
-        {
-                <text>
-                function loadPendingApprovalsCount() {
-                    const apiUrl = AppConfig.buildApiUrl('approvalrequests?pageNumber=1&pageSize=1');
-
-                    $.ajax({
-                        url: apiUrl,
-                        type: 'GET',
-                        headers: {
-                            'Authorization': 'Bearer ' + $('#jwtToken').val()
-                        },
-                        success: function(data) {
-                            const count = data.totalCount || 0;
-                            updatePendingApprovalsCount(count);
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('Failed to load pending approvals:', error);
-                        }
-                    });
-                }
-
-                function updatePendingApprovalsCount(count) {
-                    const $badge = $('#pendingApprovalsCount');
-                    if (count > 0) {
-                        $badge.text(count).show();
-                    } else {
-                        $badge.hide();
-                    }
-
-                    const $sidebarBadge = $('#sidebarPendingCount');
-                    if ($sidebarBadge.length) {
-                        if (count > 0) {
-                            $sidebarBadge.text(count).show();
-                        } else {
-                            $sidebarBadge.hide();
-                        }
-                    }
-                }
-                </text>
+        function decrementNotificationCount() {
+            const $badge = $('#notificationBadge');
+            const current = parseInt($badge.text()) || 0;
+            if (current > 0) {
+                updateNotificationBadge(current - 1);
+            }
         }
 
         // Helper functions
@@ -583,9 +595,9 @@
             const diffDays = Math.floor(diffHours / 24);
 
             if (diffSecs < 60) return 'just now';
-            if (diffMins < 60) return diffMins + 'm ago';
-            if (diffHours < 24) return diffHours + 'h ago';
-            if (diffDays < 30) return diffDays + 'd ago';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 30) return `${diffDays}d ago`;
 
             return date.toLocaleDateString('en-US', {
                 month: 'short',
@@ -600,8 +612,8 @@
                 'ApprovalResponse': 'fas fa-check-circle',
                 'ProductUpdate': 'fas fa-box',
                 'RouteUpdate': 'fas fa-route',
-                'RouteCompleted': 'fas fa-check-double',
-                'TransferCompleted': 'fas fa-exchange-alt',
+                'RouteCompleted':'fas fa-check-double',
+                'TransferCompleted':'fas fa-exchange-alt',
                 'System': 'fas fa-info-circle'
             };
             return icons[type] || 'fas fa-bell';
@@ -626,8 +638,8 @@
                 'ApprovalResponse': 'bg-success',
                 'ProductUpdate': 'bg-info',
                 'RouteUpdate': 'bg-primary',
-                'RouteCompleted': 'bg-success',
-                'TransferCompleted': 'bg-success',
+                'RouteCompleted':'bg-success',
+                'TransferCompleted':'bg-success',
                 'System': 'bg-secondary'
             };
             return colors[type] || 'bg-primary';
@@ -641,12 +653,7 @@
                 '"': '&quot;',
                 "'": '&#039;'
             };
-            return text ? text.replace(/[&<>"']/g, m => map[m]) : '';
-        }
-
-        // Sidebar toggle function
-        function toggleSidebar() {
-            document.body.classList.toggle('sidebar-open');
+            return text.replace(/[&<>"']/g, m => map[m]);
         }
     </script>
 
