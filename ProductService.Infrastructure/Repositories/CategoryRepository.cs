@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ProductService.Domain.Common;
 using ProductService.Domain.Entities;
 using ProductService.Domain.Repositories;
 using ProductService.Infrastructure.Data;
@@ -16,7 +17,9 @@ namespace ProductService.Infrastructure.Repositories
 
         public async Task<Category?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
-            return await _context.Categories.FindAsync(new object[] { id }, cancellationToken);
+            return await _context.Categories
+                .Include(c => c.Products)
+                .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
         }
 
         public async Task<IEnumerable<Category>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -24,6 +27,29 @@ namespace ProductService.Infrastructure.Repositories
             return await _context.Categories
                 .Include(p=>p.Products)
                 .ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<Category>> GetPagedAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+        {
+            var query = _context.Categories
+                .Include(c => c.Products)
+                .AsQueryable();
+
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderBy(c => c.Name)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<Category>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
         }
 
         public async Task<Category> AddAsync(Category category, CancellationToken cancellationToken = default)
@@ -52,7 +78,6 @@ namespace ProductService.Infrastructure.Repositories
         public async Task<int?> GetProductCountAsync(int categoryId, CancellationToken cancellationToken = default)
         {
             return await _context.Products
-                .Include(c=>c.Category)
                 .Where(c=>c.CategoryId==categoryId)
                 .CountAsync(cancellationToken);
         }

@@ -18,7 +18,7 @@ namespace ProductService.Application.Mappings
             // Category mappings
             CreateMap<Category, CategoryDto>()
                 .ForMember(dest => dest.ProductCount,
-                 opt => opt.MapFrom(src => src.Products.Count));
+                    opt => opt.MapFrom(src => src.Products != null ? src.Products.Count : 0));
 
             CreateMap<CreateCategoryDto, Category>()
                 .ConstructUsing(src => new Category(src.Name, src.Description,src.IsActive));
@@ -26,9 +26,14 @@ namespace ProductService.Application.Mappings
             // Department mappings
             CreateMap<Department, DepartmentDto>()
                 .ForMember(dest => dest.ProductCount,
-                opt => opt.MapFrom(src => src.Products.Count))
+                    opt => opt.MapFrom(src => src.Products != null ? src.Products.Count : 0))
                 .ForMember(dest => dest.WorkerCount,
-                opt => opt.MapFrom(src => src.WorkerCount));
+                    opt => opt.MapFrom(src => src.Products != null
+                        ? src.Products.Where(p => !string.IsNullOrEmpty(p.Worker))
+                            .Select(p => p.Worker)
+                            .Distinct()
+                            .Count()
+                        : 0));
 
             CreateMap<CreateDepartmentDto, Department>()
                 .ConstructUsing(src => new Department(src.Name, src.Description,src.IsActive));
