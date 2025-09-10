@@ -28,8 +28,8 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: inventory_rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -80,8 +80,8 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=product_service;Username=${DB_USER};Password=${DB_PASSWORD};
       - ConnectionStrings__Seq=http://seq:80
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=${RABBITMQ_USER}
-      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
       - Jwt__Key=${JWT_SECRET_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
@@ -110,8 +110,8 @@ services:
       - ConnectionStrings__Seq=http://seq:80
       - RabbitMQ__HostName=rabbitmq
       - ProductService__BaseUrl=http://product-service
-      - RabbitMQ__UserName=${RABBITMQ_USER}
-      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
       - Jwt__Key=${JWT_SECRET_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
@@ -139,8 +139,8 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=approval_service;Username=${DB_USER};Password=${DB_PASSWORD};
       - ConnectionStrings__Seq=http://seq:80
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=${RABBITMQ_USER}
-      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
       - Jwt__Key=${JWT_SECRET_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
@@ -167,8 +167,8 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=notification_service;Username=${DB_USER};Password=${DB_PASSWORD};
       - ConnectionStrings__Seq=http://seq:80
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=${RABBITMQ_USER}
-      - RabbitMQ__Password=${RABBITMQ_PASSWORD}
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
       - Jwt__Key=${JWT_SECRET_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
