@@ -1,5 +1,5 @@
 ﻿window.AppConfig = {
-    environment: (window.ASPNETCORE_ENVIRONMENT || "Production"),
+    environment: '@Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")',
 
     api: {
         baseUrl: window.location.origin,
