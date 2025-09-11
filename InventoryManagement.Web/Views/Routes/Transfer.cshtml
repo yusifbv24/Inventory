@@ -280,8 +280,7 @@
                 url: `/api/products/search/inventory-code/${inventoryCode}`,
                 type: 'GET',
                  headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Accept': 'application/json'
                 },
                 success: function(product) {
                     hideSearching();
@@ -311,6 +310,9 @@
                             window.location.href = '/Account/Login?returnUrl=' + window.location.pathname;
                         }, 2000);
                     }
+                 else if (xhr.responseJSON) {
+                    errorMessage = xhr.responseJSON.message || errorMessage;
+                }
 
                     showError(errorMessage);
                     hideProductInfo();
@@ -321,44 +323,49 @@
 
         function checkPendingRoutes(productId)
         {
-                // Remove any existing warnings first
-                $('.route-warning').remove();
+        // Remove any existing warnings first
+        $('.route-warning').remove();
 
             $.ajax({
-                url: `/api/inventoryroutes/product/${productId}`,
+                url: '/api/inventoryroutes/product/' + productId,
                 type:'GET',
                 headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Accept': 'application/json'
                 },
                 success: function(routes) {
-                    const pendingRoutes = routes.filter(r => !r.isCompleted);
+            if (routes && Array.isArray(routes)) {
+                const pendingRoutes = routes.filter(r => !r.isCompleted);
 
-                    if (pendingRoutes.length > 0) {
-                        const lastPending = pendingRoutes[0];
-                        const warningHtml = `
-                            <div class="alert alert-warning mt-3 route-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <strong>Warning:</strong> This product has a pending transfer to ${lastPending.toDepartmentName}
-                                created on ${new Date(lastPending.createdAt).toLocaleDateString()}.
-                                <br>
-                                <small>The pending transfer must be completed or cancelled before creating a new one.</small>
-                            </div>
-                        `;
-                        $('#productInfo').after(warningHtml);
-                        hideTransferFields();
-                    } else {
-                        showTransferFields();
-                        hideError();
-                    }
-                },
-                error: function(xhr) {
-                    console.error('Failed to check pending routes:', xhr);
-                    // Continue anyway if check fails
+                if (pendingRoutes.length > 0) {
+                    const lastPending = pendingRoutes[0];
+                    const warningHtml = `
+                        <div class="alert alert-warning mt-3 route-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Warning:</strong> This product has a pending transfer to ${lastPending.toDepartmentName}
+                            created on ${new Date(lastPending.createdAt).toLocaleDateString()}.
+                            <br>
+                            <small>The pending transfer must be completed or cancelled before creating a new one.</small>
+                        </div>
+                    `;
+                    $('#productInfo').after(warningHtml);
+                    hideTransferFields();
+                } else {
                     showTransferFields();
+                    hideError();
                 }
-            });
+            } else {
+                // If response is not an array, still show transfer fields
+                showTransferFields();
+                hideError();
+            }
+        },
+        error: function(xhr) {
+            console.log('Note: Could not check pending routes, continuing anyway');
+            // Don't block on error - allow transfer to proceed
+            showTransferFields();
         }
+    });
+}
 
         function displayProductInfo(product) {
             $('#productModel').text(product.model || 'N/A');

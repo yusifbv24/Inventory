@@ -28,6 +28,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+function ajaxWithLoader(options) {
+    showLoader();
+
+    const originalComplete = options.complete;
+    options.complete = function (xhr, status) {
+        hideLoader();
+        if (originalComplete) {
+            originalComplete(xhr, status);
+        }
+    };
+
+    return $.ajax(options);
+}
+
+
 // AJAX helper functions
 function showSpinner() {
     const spinner = document.createElement('div');
@@ -231,15 +246,6 @@ function hideLoader() {
     $('.loader-overlay').remove();
 }
 
-// Update AJAX calls to show/hide loader
-$.ajaxSetup({
-    beforeSend: function () {
-        showLoader();
-    },
-    complete: function () {
-        hideLoader();
-    }
-});
 function handleApprovalResponse(response, entityType, successRedirect) {
     // Debug logging
     console.log('Response type:', typeof response);

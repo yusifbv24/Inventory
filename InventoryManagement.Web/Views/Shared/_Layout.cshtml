@@ -172,6 +172,10 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/errorHandler.js" asp-append-version="true"></script>
     <script src="~/js/app-config.js" asp-append-version="true"></script>
+    @if (User.IsInRole("Admin"))
+    {
+        <script src="~/js/admin-approval.js"></script>
+    }
     <script>
         // Global notification variables
         let notificationConnection = null;
@@ -335,45 +339,30 @@
             
         function playNotificationSound() {
             try {
-                const audio = new Audio('/sounds/notify.mp3');
-                audio.volume = 0.5;
-
-                // Handle missing audio file gracefully
-                audio.addEventListener('error', function(e) {
-                    console.warn('Notification sound file not found, using fallback');
-                    // Use a simple beep as fallback
-                    const context = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = context.createOscillator();
-                    const gainNode = context.createGain();
-
-                    oscillator.connect(gainNode);
-                    gainNode.connect(context.destination);
-
-                    gainNode.gain.value = 0.1;
-                    oscillator.frequency.value = 800;
-                    oscillator.type = 'sine';
-
-                    oscillator.start();
-                    setTimeout(() => oscillator.stop(), 200);
-                });
-
-                // Attempt to play the sound
-                const playPromise = audio.play();
-
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.warn('Autoplay prevented:', error);
-                        // Store for later playback after user interaction
-                        document.addEventListener('click', function playOnUserInteraction() {
-                            audio.play().catch(e => console.log('Still cannot play:', e));
-                            document.removeEventListener('click', playOnUserInteraction);
-                        }, { once: true });
-                    });
-                }
+                // Create audio context for fallback beep
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const audioContext = new AudioContext();
+        
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+        
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+        
+                gainNode.gain.value = 0.1;
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+        
+                oscillator.start();
+                setTimeout(() => {
+                    oscillator.stop();
+                    audioContext.close();
+                }, 200);
             } catch (error) {
-                console.error('Error playing notification sound:', error);
+                console.log('Could not play notification sound:', error);
             }
         }
+           window.playNotificationSound = playNotificationSound;
 
         function setupNotificationHandlers() {
             // Notification bell click handler
@@ -389,10 +378,7 @@
             });
         }
 
-        @if (User.IsInRole("Admin"))
-        {
-            <script src="~/js/admin-approval.js"></script>
-        }
+        
 
         function loadNotificationCount() {
             $.ajax({
