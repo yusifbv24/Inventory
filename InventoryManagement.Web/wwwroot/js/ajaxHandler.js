@@ -28,8 +28,17 @@
             $form.find('.invalid-feedback').remove();
             $form.find('.alert-danger').remove();
 
+            // Call beforeSubmit if provided
+            if (settings.beforeSubmit) {
+                if (settings.beforeSubmit(form) === false) {
+                    return false;
+                }
+            }
+
             // Store original button state
             const originalBtnHtml = $submitBtn.html();
+            const originalBtnDisabled = $submitBtn.prop('disabled');
+
             $submitBtn.prop('disabled', true)
                 .html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
 
@@ -44,37 +53,45 @@
                 },
                 success: function (response) {
                     // Reset button
-                    $submitBtn.prop('disabled', false).html(originalBtnHtml);
+                    $submitBtn.prop('disabled', originalBtnDisabled).html(originalBtnHtml);
 
                     // Check response type
                     if (response && typeof response === 'object') {
                         if (response.isSuccess === false) {
-                            // Handle validation errors
+                            // This is an error - handle it and DON'T redirect
                             if (response.errors) {
                                 showValidationErrors($form, response.errors);
                             }
+                            
+                            // Show error message at top of form
+                            const alertHtml = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="fas fa-exclamation-circle me-2"></i>${response.message || 'Operation failed'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>`;
+                            $form.prepend(alertHtml);
+                            
                             showToast(response.message || 'Operation failed', 'error');
 
                             if (settings.onError) {
                                 settings.onError(response.message, response);
                             }
-                        } else if (response.isApprovalRequest) {
+                            
+                            // Scroll to top to show error
+                            $('html, body').animate({ scrollTop: 0 }, 'fast');
+                            return; // Don't continue processing
+                        } 
+                        else if (response.isApprovalRequest) {
                             // Handle approval request
                             showToast(response.message || 'Request submitted for approval', 'info');
-
-                            // Play notification sound
-                            if (typeof playNotificationSound === 'function') {
-                                playNotificationSound();
-                            }
-
+                            
                             if (settings.successRedirect) {
                                 setTimeout(() => window.location.href = settings.successRedirect, settings.redirectDelay);
                             }
-                        } else {
-                            // Success
+                        } 
+                        else {
+                            // Actual success
                             showToast(settings.successMessage, 'success');
-
-                            // Play notification sound
+                            
                             if (typeof playNotificationSound === 'function') {
                                 playNotificationSound();
                             }
@@ -89,20 +106,17 @@
                             }
                         }
                     } else {
-                        // Plain success
+                        // Plain success response
                         showToast(settings.successMessage, 'success');
-                        if (typeof playNotificationSound === 'function') {
-                            playNotificationSound();
-                        }
-
+                        
                         if (settings.successRedirect) {
                             setTimeout(() => window.location.href = settings.successRedirect, settings.redirectDelay);
                         }
                     }
                 },
                 error: function (xhr) {
-                    // Reset button
-                    $submitBtn.prop('disabled', false).html(originalBtnHtml);
+                    // Always reset button on error
+                    $submitBtn.prop('disabled', originalBtnDisabled).html(originalBtnHtml);
 
                     let errorMessage = 'An error occurred';
 
@@ -132,10 +146,13 @@
                     if (settings.onError) {
                         settings.onError(errorMessage, xhr);
                     }
+                    
+                    // Scroll to top to show error
+                    $('html, body').animate({ scrollTop: 0 }, 'fast');
                 }
             });
 
-            return false; // Ensure form doesn't submit normally
+            return false;
         });
     }
 

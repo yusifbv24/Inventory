@@ -277,10 +277,11 @@
             $('.route-warning').remove();
 
             $.ajax({
-                url: `/api/products/search/inventory-code/${inventoryCode}`,
+                url: window.AppConfig.buildApiUrl('products/search/inventory-code/' + inventoryCode),
                 type: 'GET',
                  headers: {
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer ' + $('#jwtToken').val() // Add auth header
                 },
                 success: function(product) {
                     hideSearching();

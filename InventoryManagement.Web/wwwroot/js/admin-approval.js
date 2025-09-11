@@ -4,7 +4,7 @@ function loadPendingApprovalsCount() {
     if (!isAdmin) return;
 
     $.ajax({
-        url: '/api/approvalrequests',
+        url: window.AppConfig.buildApiUrl('/approvalrequests'),
         type: 'GET',
         data: { pageNumber: 1, pageSize: 1 },
         headers: {

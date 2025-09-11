@@ -14,15 +14,20 @@
         }
     },
 
+    getApiBaseUrl: function () {
+        if (this.environment === 'Development') {
+            return 'http://localhost:5000'; // Use your API gateway URL
+        }
+        return 'https://inventory166.az';
+    },
+
     buildApiUrl: function (endpoint) {
         endpoint = endpoint.replace(/^\//, '');
-        return `/api/${endpoint}`;
+        const baseUrl = this.getApiBaseUrl();
+        return `${baseUrl}/api/${endpoint}`;
     },
 
     getApiGatewayUrl: function () {
-        if (this.environment === 'Development') {
-            return 'http://localhost:5000';
-        }
-        return 'https://inventory166.az';
+        return this.getApiBaseUrl(); // Reuse the same logic
     }
 };

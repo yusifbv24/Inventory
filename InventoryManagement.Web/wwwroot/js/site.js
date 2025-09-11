@@ -166,7 +166,7 @@ function getToastTitle(type) {
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
-    // Handle null, undefined, or non-string values gracefully
+    // Handle null, undefined, or non-string values
     if (unsafe === null || unsafe === undefined) {
         return '';
     }
