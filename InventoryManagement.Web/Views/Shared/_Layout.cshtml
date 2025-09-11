@@ -336,33 +336,49 @@
                     });
             }
         }
-            
-        function playNotificationSound() {
-            try {
-                // Create audio context for fallback beep
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const audioContext = new AudioContext();
-        
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-        
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-        
-                gainNode.gain.value = 0.1;
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-        
-                oscillator.start();
-                setTimeout(() => {
-                    oscillator.stop();
-                    audioContext.close();
-                }, 200);
-            } catch (error) {
-                console.log('Could not play notification sound:', error);
-            }
-        }
-           window.playNotificationSound = playNotificationSound;
+
+           function playNotificationSound() {
+                   try {
+                       // First, ensure the sound file exists
+                       const audioUrl = '/sounds/notify.mp3';
+
+                       // Create a promise to handle the audio loading
+                       const audio = new Audio();
+                       audio.volume = 0.5;
+
+                       // Add error handling for missing file
+                       audio.addEventListener('error', function(e) {
+                           console.error('Audio file error:', e);
+                           // Fallback to a data URI beep sound if file is missing
+                           const beepSound = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE';
+                           audio.src = beepSound;
+                           audio.play().catch(err => console.log('Fallback sound failed:', err));
+                       });
+
+                       // Set the source and attempt to play
+                       audio.src = audioUrl;
+
+                       // Use a more robust play mechanism
+                       const playPromise = audio.play();
+
+                       if (playPromise !== undefined) {
+                           playPromise
+                               .then(() => {
+                                   console.log('Notification sound played successfully');
+                               })
+                               .catch(error => {
+                                   console.error('Error playing notification sound:', error);
+                                   // Try to play after user interaction if autoplay is blocked
+                                   document.addEventListener('click', function playOnce() {
+                                       audio.play().catch(e => console.log('Still cannot play:', e));
+                                       document.removeEventListener('click', playOnce);
+                                   });
+                               });
+                       }
+                   } catch (error) {
+                       console.error('Error in playNotificationSound:', error);
+                   }
+               }
 
         function setupNotificationHandlers() {
             // Notification bell click handler
