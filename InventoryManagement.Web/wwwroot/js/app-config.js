@@ -1,13 +1,13 @@
 ﻿window.AppConfig = {
-    environment: '@Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")',
+    environment: window.location.hostname === 'localhost' ? 'Development' : 'Production',
 
     api: {
-        baseUrl: window.location.origin,
+        baseUrl: '',
         timeout: 30000
     },
 
     signalR: {
-        notificationHub: window.location.origin + '/notificationHub',
+        notificationHub: '/notificationHub',
         options: {
             transport: 1 | 2 | 4, // WebSockets | ServerSentEvents | LongPolling
             withCredentials: true
@@ -15,7 +15,14 @@
     },
 
     buildApiUrl: function (endpoint) {
-        const baseUrl = this.api.baseUrl;
-        return `${baseUrl}/api/${endpoint}`;
+        endpoint = endpoint.replace(/^\//, '');
+        return `/api/${endpoint}`;
+    },
+
+    getApiGatewayUrl: function () {
+        if (this.environment === 'Development') {
+            return 'http://localhost:5000';
+        }
+        return 'https://inventory166.az';
     }
 };

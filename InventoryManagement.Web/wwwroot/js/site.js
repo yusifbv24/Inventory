@@ -151,11 +151,21 @@ function getToastTitle(type) {
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
+    // Handle null, undefined, or non-string values
+    if (unsafe === null || unsafe === undefined) {
+        return '';
+    }
+
+    // Convert to string if not already
+    if (typeof unsafe !== 'string') {
+        unsafe = String(unsafe);
+    }
+
     return unsafe.replace(/&/g, "&amp;")
-                 .replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;")
-                 .replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 

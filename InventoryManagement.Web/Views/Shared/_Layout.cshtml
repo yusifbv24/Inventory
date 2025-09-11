@@ -389,6 +389,11 @@
             });
         }
 
+        @if (User.IsInRole("Admin"))
+        {
+            <script src="~/js/admin-approval.js"></script>
+        }
+
         function loadNotificationCount() {
             $.ajax({
                 url: '/Notifications/GetUnreadCount',
@@ -555,44 +560,7 @@
             }
         }
 
-        // Admin-specific functions
-        @if (User.IsInRole("Admin"))
-        {
-                <text>
-                function loadPendingApprovalsCount() {
-                    const apiUrl = AppConfig.buildApiUrl('approvalrequests?pageNumber=1&pageSize=1');
-
-                    $.ajax({
-                        url: apiUrl,
-                        type: 'GET',
-                        headers: {
-                            'Authorization': 'Bearer ' + $('#jwtToken').val()
-                        },
-                        success: function(data) {
-                            const count = data.totalCount || 0;
-                            updatePendingApprovalsCount(count);
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('Failed to load pending approvals:', error);
-                        }
-                    });
-                }
-
-                function updatePendingApprovalsCount(count) {
-                    const $badge = $('#pendingApprovalsCount');
-                    const $sidebarBadge = $('#sidebarPendingCount');
-
-                    if (count > 0) {
-                        $badge.text(count).show();
-                        $sidebarBadge.text(count).show();
-                    } else {
-                        $badge.hide();
-                        $sidebarBadge.hide();
-                    }
-                }
-                </text>
-        }
-
+        
 
         // Helper functions
         function formatTimeAgo(dateString) {

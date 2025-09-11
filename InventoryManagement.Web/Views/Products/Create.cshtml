@@ -174,24 +174,77 @@
         const $submitBtn = $('button[type="submit"]');
         const originalBtnHtml = $submitBtn.html();
 
-            AjaxHandler.handleForm('form', {
-                successMessage: 'Product created successfully!',
-                successRedirect: '/Products',
-                onError: function(errorMessage, response) {
-                    // Always reset button on error
-                    $submitBtn.prop('disabled', false).html(originalBtnHtml);
-
-                    // Clear previous error states
-            $('.is-invalid').removeClass('is-invalid');
-            $('.invalid-feedback').remove();
-
-                    // Special handling for inventory code errors
-            if (errorMessage.toLowerCase().includes('inventory code')) {
-                $('#InventoryCode').addClass('is-invalid');
-                if (!$('#InventoryCode').next('.invalid-feedback').length) {
-                    $('#InventoryCode').after('<div class="invalid-feedback">' + errorMessage + '</div>');
-                }
-            }}
+        $('form').on('submit', function(e) {
+                e.preventDefault();
+                
+                const form = this;
+                const formData = new FormData(form);
+                
+                // Disable submit button
+                $submitBtn.prop('disabled', true)
+                    .html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
+                
+                $.ajax({
+                    url: form.action,
+                    type: form.method,
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function(response) {
+                        // Play notification sound
+                        try {
+                            const audio = new Audio('/sounds/notify.mp3');
+                            audio.volume = 0.5;
+                            audio.play().catch(e => console.log('Could not play sound:', e));
+                        } catch (e) {
+                            console.log('Audio not available');
+                        }
+                        
+                        // Show success message
+                        if (response.approvalRequestId) {
+                            showToast('Product creation request submitted for approval', 'info');
+                        } else {
+                            showToast('Product created successfully!', 'success');
+                        }
+                        
+                        // Redirect after a short delay
+                        setTimeout(() => {
+                            window.location.href = '/Products';
+                        }, 1500);
+                    },
+                    error: function(xhr) {
+                        // Reset button on error
+                        $submitBtn.prop('disabled', false).html(originalBtnHtml);
+                        
+                        // Clear previous error states
+                        $('.is-invalid').removeClass('is-invalid');
+                        $('.invalid-feedback').remove();
+                        
+                        let errorMessage = 'Error creating product';
+                        try {
+                            if (xhr.responseJSON) {
+                                errorMessage = xhr.responseJSON.error || 
+                                             xhr.responseJSON.message || 
+                                             errorMessage;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing response:', e);
+                        }
+                        
+                        // Special handling for inventory code errors
+                        if (errorMessage.toLowerCase().includes('inventory code')) {
+                            $('#InventoryCode').addClass('is-invalid');
+                            if (!$('#InventoryCode').next('.invalid-feedback').length) {
+                                $('#InventoryCode').after('<div class="invalid-feedback">' + errorMessage + '</div>');
+                            }
+                        }
+                        
+                        showToast(errorMessage, 'error');
+                    }
+                });
             });
         });
     </script>

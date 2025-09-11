@@ -159,9 +159,8 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/app-config.js"></script>
     <script>
-        // Declare variables in higher scope
         let searchTimeout;
-        let currentProductId = null; // Added missing variable
+        let currentProductId = null; 
 
         $(document).ready(function() {
             // Focus on inventory code input
@@ -199,8 +198,8 @@
                 }, 500);
             });
 
-            // Fixed form submission handler
-                $('#transferForm').on('submit', function(e) {
+    // Fixed form submission handler
+        $('#transferForm').on('submit', function(e) {
         e.preventDefault();
 
         if (!currentProductId) {
@@ -212,18 +211,7 @@
         const form = this;
         const $submitBtn = $('#submitBtn');
         const originalBtnHtml = $submitBtn.html();
-        const originalBtnDisabled = $submitBtn.prop('disabled');
 
-         // Store original state
-        $submitBtn.data('original-html', originalBtnHtml);
-        $submitBtn.data('original-disabled', originalBtnDisabled);
-
-
-        // Function to reset button
-            const resetButton = () => {
-                $submitBtn.prop('disabled', $submitBtn.data('original-disabled') || false)
-                          .html($submitBtn.data('original-html') || 'Transfer Product');
-            };
 
         // Disable submit button
         $submitBtn.prop('disabled', true)
@@ -237,60 +225,63 @@
             data: formData,
             processData: false,
             contentType: false,
-            success: function(response) {
-                resetButton(); // Always reset button first
-
-                if (response.approvalRequestId || response.status === 'PendingApproval') {
-                    showToast(
-                        response.message || 'Transfer request submitted for approval',
-                        'info'
-                    );
-                    setTimeout(() => window.location.href = '/Routes', 2000);
-                }
-                else if (response.isSuccess !== false) {
-                showToast('Product transferred successfully!', 'success');
-                setTimeout(() => window.location.href = '/Routes', 1500);
-                }
-                else {
-                    showError(response.message || 'Transfer failed');
-                }
+            headers: {
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
             },
-            error: function(xhr) {
-                resetButton(); // Always reset button on error
+            success: function(response) {
+                        // Reset button first
+                        $submitBtn.prop('disabled', false).html(originalBtnHtml);
 
-                let errorMessage = 'Error processing transfer';
-                try {
-                    if (xhr.responseJSON) {
-                        errorMessage = xhr.responseJSON.message ||
-                                      xhr.responseJSON.error ||
-                                      xhr.responseJSON.title ||
-                                      errorMessage;
-                    } 
-                    else if (xhr.responseText && xhr.responseText.length < 500) {
-                        errorMessage = xhr.responseText;
-                    }} 
-                    catch (e) {
-                    console.error('Error parsing error response:', e);
-                    }
-                    showError(errorMessage);
+                        if (response.approvalRequestId || response.status === 'PendingApproval') {
+                            showToast(
+                                response.message || 'Transfer request submitted for approval',
+                                'info'
+                            );
+                            setTimeout(() => window.location.href = '/Routes', 2000);
+                        }
+                        else if (response.isSuccess !== false) {
+                            showToast('Product transferred successfully!', 'success');
+                            setTimeout(() => window.location.href = '/Routes', 1500);
+                        }
+                        else {
+                            showError(response.message || 'Transfer failed');
+                        }
                     },
-                complete: function() {
-                // Failsafe: Always reset button after 5 seconds
-                setTimeout(resetButton, 5000);
-                }});
+            error: function(xhr) {
+                        // Reset button on error
+                        $submitBtn.prop('disabled', false).html(originalBtnHtml);
+
+                        let errorMessage = 'Error processing transfer';
+                        try {
+                            if (xhr.responseJSON) {
+                                errorMessage = xhr.responseJSON.message ||
+                                              xhr.responseJSON.error ||
+                                              xhr.responseJSON.title ||
+                                              errorMessage;
+                            } 
+                            else if (xhr.responseText && xhr.responseText.length < 500) {
+                                errorMessage = xhr.responseText;
+                            }
+                        } 
+                        catch (e) {
+                            console.error('Error parsing error response:', e);
+                        }
+                        showError(errorMessage);
+                    }
+                });
             });
         });
 
         // Moved searchProduct function to global scope
         function searchProduct(inventoryCode) {
             $('.route-warning').remove();
-            const apiUrl = AppConfig.buildApiUrl(`products/search/inventory-code/${inventoryCode}`);
 
             $.ajax({
-                url: apiUrl,
+                url: `/api/products/search/inventory-code/${inventoryCode}`,
                 type: 'GET',
-                headers: {
-                    'Authorization': 'Bearer @ViewBag.JwtToken'
+                 headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 success: function(product) {
                     hideSearching();
@@ -333,28 +324,27 @@
                 // Remove any existing warnings first
                 $('.route-warning').remove();
 
-             const apiUrl = AppConfig.buildApiUrl(`inventoryroutes/product/${productId}`);
-
             $.ajax({
-                url: apiUrl,
+                url: `/api/inventoryroutes/product/${productId}`,
                 type:'GET',
-                headers:{
-                    'Authorization':'Bearer @ViewBag.JwtToken'
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                        success: function(routes) {
+                success: function(routes) {
                     const pendingRoutes = routes.filter(r => !r.isCompleted);
 
                     if (pendingRoutes.length > 0) {
                         const lastPending = pendingRoutes[0];
                         const warningHtml = `
-                    <div class="alert alert-warning mt-3 route-warning">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Warning:</strong> This product has a pending transfer to ${lastPending.toDepartmentName}
-                        created on ${new Date(lastPending.createdAt).toLocaleDateString()}.
-                        <br>
-                        <small>The pending transfer must be completed or cancelled before creating a new one.</small>
-                    </div>
-                `;
+                            <div class="alert alert-warning mt-3 route-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Warning:</strong> This product has a pending transfer to ${lastPending.toDepartmentName}
+                                created on ${new Date(lastPending.createdAt).toLocaleDateString()}.
+                                <br>
+                                <small>The pending transfer must be completed or cancelled before creating a new one.</small>
+                            </div>
+                        `;
                         $('#productInfo').after(warningHtml);
                         hideTransferFields();
                     } else {
@@ -363,10 +353,10 @@
                     }
                 },
                 error: function(xhr) {
-                console.error('Failed to check pending routes:', xhr);
-                // Continue anyway if check fails
-                showTransferFields();
-        }
+                    console.error('Failed to check pending routes:', xhr);
+                    // Continue anyway if check fails
+                    showTransferFields();
+                }
             });
         }
 
@@ -374,7 +364,12 @@
             $('#productModel').text(product.model || 'N/A');
             $('#productVendor').text(product.vendor || 'N/A');
             $('#productCategory').text(product.categoryName || 'N/A');
-            $('#currentDepartment').text(product.departmentName || 'N/A');
+
+            let departmentInfo = product.departmentName || 'N/A';
+            if (product.worker) {
+                departmentInfo += ` (Worker: ${product.worker})`;
+            }
+            $('#currentDepartment').text(departmentInfo);
 
             $('#productInfo').slideDown();
             $('#searchFeedback').html('<span class="text-success"><i class="fas fa-check-circle"></i> Product found!</span>');
