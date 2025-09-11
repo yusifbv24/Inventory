@@ -138,7 +138,15 @@ namespace InventoryManagement.Web.Controllers
                 var form = HttpContext.Request.Form;
                 var response = await _apiService.PostFormAsync<dynamic>("api/products", form, dto);
 
-                return HandleApiResponse(response, "Index");
+                // If the response is not successful, stay on the create view
+                if (!response.IsSuccess && !response.IsApprovalRequest)
+                {
+                    await LoadDropdowns(productModel);
+                    ModelState.AddModelError("", response.Message ?? "Failed to create product");
+                    return View(productModel);
+                }
+
+                return HandleApiResponse(response, "Index",productModel);
             }
             catch (Exception ex)
             {
@@ -185,14 +193,23 @@ namespace InventoryManagement.Web.Controllers
                 await LoadDropdowns(productModel);
                 return HandleValidationErrors(productModel);
             }
+
             try
             {
                 var form = HttpContext.Request.Form;
                 var response = await _apiService.PutFormAsync<bool>($"api/products/{id}", form, productModel);
 
-                return HandleApiResponse(response, "Index");
+                // If the response is not successful, stay on the edit view
+                if (!response.IsSuccess && !response.IsApprovalRequest)
+                {
+                    await LoadDropdowns(productModel);
+                    ModelState.AddModelError("", response.Message ?? "Failed to update product");
+                    return View(productModel);
+                }
+
+                return HandleApiResponse(response, "Index", productModel);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 await LoadDropdowns(productModel);
                 return HandleException(ex, productModel);

@@ -165,29 +165,36 @@ namespace InventoryManagement.Web.Controllers
             }
             try
             {
-                // Get product details first to include in approval request
+                // Check if product exists first
                 var product = await _apiService.GetAsync<ProductDto>($"api/products/{model.ProductId}");
-                var departments = await _apiService.GetAsync<List<DepartmentDto>>("api/departments");
 
-                var fromDepartment = departments?.FirstOrDefault(d => d.Id == product?.DepartmentId);
+                if (product == null)
+                {
+                    await LoadTransferDropdowns(model);
+                    ModelState.AddModelError("ProductId", "Product not found. Please select a valid product.");
+                    return View(model);
+                }
+
+                var departments = await _apiService.GetAsync<List<DepartmentDto>>("api/departments");
+                var fromDepartment = departments?.FirstOrDefault(d => d.Id == product.DepartmentId);
                 var toDepartment = departments?.FirstOrDefault(d => d.Id == model.ToDepartmentId);
 
                 var actionData = new Dictionary<string, object>
                 {
                     ["productId"] = model.ProductId,
-                    ["inventoryCode"] = product?.InventoryCode ?? 0,
-                    ["productModel"] = product?.Model ?? "",
-                    ["productVendor"] = product?.Vendor ?? "",
-                    ["fromDepartmentId"] = product?.DepartmentId ?? 0,
+                    ["inventoryCode"] = product.InventoryCode,
+                    ["productModel"] = product.Model ?? "",
+                    ["productVendor"] = product.Vendor ?? "",
+                    ["fromDepartmentId"] = product.DepartmentId,
                     ["fromDepartmentName"] = fromDepartment?.Name ?? "",
-                    ["fromWorker"] = product?.Worker ?? "",
+                    ["fromWorker"] = product.Worker ?? "",
                     ["toDepartmentId"] = model.ToDepartmentId,
                     ["toDepartmentName"] = toDepartment?.Name ?? "",
                     ["toWorker"] = model.ToWorker ?? "",
                     ["notes"] = model.Notes ?? ""
                 };
 
-                //Add image data if present
+                // Add image data if present
                 if (HttpContext.Request.Form.Files.Count > 0)
                 {
                     var imageFile = HttpContext.Request.Form.Files[0];
@@ -199,7 +206,15 @@ namespace InventoryManagement.Web.Controllers
 
                 var response = await _apiService.PostFormAsync<RouteViewModel>("api/inventoryroutes/transfer", HttpContext.Request.Form);
 
-                return HandleApiResponse(response, "Index");
+                // Handle errors properly
+                if (!response.IsSuccess && !response.IsApprovalRequest)
+                {
+                    await LoadTransferDropdowns(model);
+                    ModelState.AddModelError("", response.Message ?? "Failed to create transfer");
+                    return View(model);
+                }
+
+                return HandleApiResponse(response, "Index", model);
             }
             catch (Exception ex)
             {

@@ -1,5 +1,8 @@
 ﻿// Admin-specific functions
 function loadPendingApprovalsCount() {
+    // Only try to load if user is admin
+    if (!isAdmin) return;
+
     $.ajax({
         url: '/api/approvalrequests',
         type: 'GET',
@@ -13,8 +16,11 @@ function loadPendingApprovalsCount() {
             updatePendingApprovalsCount(count);
         },
         error: function (xhr, status, error) {
+            // Silently handle the error - approval service might not be available
             console.log('Note: Approval service not available');
-            // Don't show error toast for this background check
+            // Hide the approval badges since service is not available
+            $('#pendingApprovalsCount').hide();
+            $('#sidebarPendingCount').hide();
         }
     });
 }

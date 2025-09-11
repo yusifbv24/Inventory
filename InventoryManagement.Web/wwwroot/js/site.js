@@ -166,7 +166,7 @@ function getToastTitle(type) {
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
-    // Handle null, undefined, or non-string values
+    // Handle null, undefined, or non-string values gracefully
     if (unsafe === null || unsafe === undefined) {
         return '';
     }
@@ -176,7 +176,8 @@ function escapeHtml(unsafe) {
         unsafe = String(unsafe);
     }
 
-    return unsafe.replace(/&/g, "&amp;")
+    return unsafe
+        .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")

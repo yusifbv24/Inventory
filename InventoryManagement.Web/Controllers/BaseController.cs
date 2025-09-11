@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.Json;
 using InventoryManagement.Web.Models.DTOs;
-using System.Text.Json;
+using InventoryManagement.Web.Models.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace InventoryManagement.Web.Controllers
 {
@@ -29,7 +30,7 @@ namespace InventoryManagement.Web.Controllers
         /// <summary>
         /// Handles API responses uniformly for both AJAX and traditional requests
         /// </summary>
-        protected IActionResult HandleApiResponse<T>(ApiResponse<T> response, string redirectAction)
+        protected IActionResult HandleApiResponse<T>(ApiResponse<T> response, string redirectAction,object? model =null)
         {
             if (response.IsSuccess)
             {
@@ -52,7 +53,34 @@ namespace InventoryManagement.Web.Controllers
 
             if (!IsAjaxRequest())
             {
+                // Add error to ModelState to display on the view
+                ModelState.AddModelError("", response.Message ?? "Operation failed");
+
+                // If we have a model, return the view with the model
+                // This keeps the user on the same page with their input preserved
+                if (model != null)
+                {
+                    // For Create/Edit views, we need to reload dropdowns
+                    if (model is ProductViewModel productModel)
+                    {
+                        // This is handled in the controller
+                        return View(model);
+                    }
+                    return View(model);
+                }
+
                 TempData["Error"] = response.Message ?? "Operation failed";
+            }
+
+            // For AJAX requests, return JSON
+            if (IsAjaxRequest())
+            {
+                Response.StatusCode = 400;
+                return Json(new
+                {
+                    isSuccess = false,
+                    message = response.Message ?? "Operation failed"
+                });
             }
             return RedirectToAction(redirectAction);
         }
